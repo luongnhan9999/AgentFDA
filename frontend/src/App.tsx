@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 import { Navbar } from './components/Navbar';
+import { ClinicalTelemetryRibbon } from './components/ClinicalTelemetryRibbon';
 import { StatsOverview } from './components/StatsOverview';
+import { TrialPipelineSidebar } from './components/TrialPipelineSidebar';
+import { ClinicalConsoleCockpit } from './components/ClinicalConsoleCockpit';
+import { DeSciRegulatoryVaultSidebar } from './components/DeSciRegulatoryVaultSidebar';
 import { TrialCard } from './components/TrialCard';
 import { CreateTrialModal } from './components/CreateTrialModal';
 import { SubmitDataModal } from './components/SubmitDataModal';
@@ -12,7 +16,19 @@ import { AdjudicateAppealModal } from './components/AdjudicateAppealModal';
 import { BiostatisticsSimModal } from './components/BiostatisticsSimModal';
 import { ClinicalTrialData, StatsData } from './types';
 import { DEFAULT_CONTRACT_ADDRESS, CHAIN_ID_HEX } from './config/genlayer';
-import { Plus, Activity, RefreshCw, AlertCircle, Sparkles, Filter, ShieldCheck, Microscope, Database, HelpCircle } from 'lucide-react';
+import { 
+  Plus, 
+  Activity, 
+  RefreshCw, 
+  AlertCircle, 
+  Sparkles, 
+  Filter, 
+  ShieldCheck, 
+  Microscope, 
+  Database,
+  LayoutGrid,
+  Columns3
+} from 'lucide-react';
 
 export function App() {
   const [account, setAccount] = useState<string | null>(null);
@@ -26,9 +42,14 @@ export function App() {
   // Contract Data
   const [trials, setTrials] = useState<ClinicalTrialData[]>([]);
   const [stats, setStats] = useState<StatsData | null>(null);
+  const [selectedTrial, setSelectedTrial] = useState<ClinicalTrialData | null>(null);
 
-  // Filters
-  const [filterRole, setFilterRole] = useState<'all' | 'mine' | 'open' | 'active' | 'settled' | 'disputed'>('all');
+  // Layout View Mode: 'cockpit' (3-Panel Command Console) vs 'grid' (Ledger Grid)
+  const [layoutMode, setLayoutMode] = useState<'cockpit' | 'grid'>('cockpit');
+
+  // Filters & Search
+  const [filterRole, setFilterRole] = useState<'all' | 'mine' | 'open' | 'active' | 'cooling' | 'settled' | 'disputed'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -154,7 +175,17 @@ export function App() {
       if (rawAllTrials) {
         const parsedTrials: ClinicalTrialData[] =
           typeof rawAllTrials === 'string' ? JSON.parse(rawAllTrials) : rawAllTrials;
-        setTrials(parsedTrials.reverse());
+        const reversed = parsedTrials.reverse();
+        setTrials(reversed);
+
+        // Auto-select first trial for cockpit if none selected
+        if (reversed.length > 0) {
+          setSelectedTrial((prev) => {
+            if (!prev) return reversed[0];
+            const updated = reversed.find((t) => t.trial_id === prev.trial_id);
+            return updated || reversed[0];
+          });
+        }
       }
 
       // Read stats
@@ -397,26 +428,9 @@ export function App() {
     }
   };
 
-  // Filtered Trials
-  const filteredTrials = trials.filter((t) => {
-    if (filterRole === 'mine' && account) {
-      return (
-        t.sponsor.toLowerCase() === account.toLowerCase() ||
-        t.investigator.toLowerCase() === account.toLowerCase()
-      );
-    }
-    if (filterRole === 'open') return t.status === 0;
-    if (filterRole === 'active') return t.status === 1 || t.status === 2;
-    if (filterRole === 'settled') return t.status >= 3 && t.status <= 5;
-    if (filterRole === 'disputed') return t.status === 6;
-    return true;
-  });
-
-  const activeCount = trials.filter((t) => t.status === 0 || t.status === 1 || t.status === 2 || t.status === 6).length;
-
   return (
-    <div className="min-h-screen bg-clinical-slate flex flex-col selection:bg-teal-500 selection:text-white">
-      {/* Navigation */}
+    <div className="min-h-screen bg-slate-100 flex flex-col selection:bg-teal-500 selection:text-white">
+      {/* Navigation Header */}
       <Navbar
         account={account}
         balance={balance}
@@ -427,67 +441,72 @@ export function App() {
         isRefreshing={isLoadingData}
       />
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grow w-full">
-        {/* Banner Hero */}
-        <div className="bg-linear-to-r from-teal-950 via-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden mb-6 border border-teal-800/30">
-          <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold mb-4 backdrop-blur-xs">
-              <Microscope className="w-3.5 h-3.5" />
-              <span>DeSci × Autonomous AI Regulatory Jury</span>
-            </div>
-            <h1 className="font-space font-bold text-2xl sm:text-4xl tracking-tight leading-tight">
-              AgentFDA: Autonomous Clinical Trial Milestone & Patient Safety Oracle
-            </h1>
-            <p className="mt-3 text-sm sm:text-base text-slate-300 font-sans leading-relaxed">
-              Eliminate sponsor bias and clinical p-hacking. GenLayer GenVM validators independently ingest de-identified cohort datasets, audit DSMB safety feeds, and release milestone grants upon mathematical consensus.
-            </p>
+      {/* Real-time DSMB Biostatistical Telemetry Ribbon */}
+      <ClinicalTelemetryRibbon />
 
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+      {/* Main Workspace Area */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grow w-full space-y-6">
+        {/* Global Action Bar with Layout Toggle */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs">
               <button
-                onClick={() => setIsCreateOpen(true)}
-                className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-xs sm:text-sm rounded-xl shadow-lg shadow-teal-500/20 transition-all flex items-center gap-2"
+                onClick={() => setLayoutMode('cockpit')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  layoutMode === 'cockpit'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <Plus className="w-4 h-4" />
-                <span>Deposit Milestone Grant</span>
+                <Columns3 className="w-3.5 h-3.5 text-teal-400" />
+                <span>Regulatory Console</span>
               </button>
               <button
-                onClick={() => setIsLibraryOpen(true)}
-                className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-teal-200 font-medium text-xs sm:text-sm rounded-xl border border-teal-400/30 transition-all flex items-center gap-2"
+                onClick={() => setLayoutMode('grid')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  layoutMode === 'grid'
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <Database className="w-4 h-4 text-teal-400" />
-                <span>Study Case Library</span>
+                <LayoutGrid className="w-3.5 h-3.5 text-teal-400" />
+                <span>Protocol Grid</span>
               </button>
-              <a
-                href="https://github.com/luongnhan9999/AgentFDA"
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-medium text-xs sm:text-sm rounded-xl border border-white/20 transition-all flex items-center gap-2"
-              >
-                <ShieldCheck className="w-4 h-4 text-teal-400" />
-                <span>Protocol Specs</span>
-              </a>
             </div>
+
+            <button
+              onClick={() => setIsLibraryOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-semibold shadow-2xs transition-all"
+            >
+              <Database className="w-3.5 h-3.5 text-teal-600" />
+              <span>Study Case Library</span>
+            </button>
           </div>
 
-          {/* Decorative Background Blob */}
-          <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute right-40 -top-20 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Deposit Milestone Grant</span>
+            </button>
+          </div>
         </div>
 
         {/* Global Stats Overview */}
         <StatsOverview
           stats={stats || { total_trials: trials.length, total_grant_locked: '0', total_trials_settled: 0, owner: '' }}
-          activeCount={activeCount}
+          activeCount={trials.filter((t) => t.status < 3 || t.status === 6).length}
         />
 
-        {/* Status / Transaction Pending Notification */}
+        {/* Transaction Status Pill */}
         {isTxPending && (
-          <div className="my-4 p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 flex items-center gap-3 animate-pulse shadow-xs">
+          <div className="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 flex items-center gap-3 animate-pulse shadow-xs">
             <RefreshCw className="w-5 h-5 animate-spin text-teal-600 shrink-0" />
             <div>
               <div className="font-semibold text-xs uppercase tracking-wider text-teal-700">
-                GenLayer GenVM Consensus Active
+                GenVM Consensus Transaction In Progress
               </div>
               <div className="text-xs text-teal-800">{txMessage}</div>
             </div>
@@ -496,7 +515,7 @@ export function App() {
 
         {/* Error Notification */}
         {errorMsg && (
-          <div className="my-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start justify-between gap-3 shadow-xs">
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start justify-between gap-3 shadow-xs">
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
@@ -515,68 +534,28 @@ export function App() {
           </div>
         )}
 
-        {/* Filter Navigation */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-8 mb-6">
-          <div className="flex items-center gap-2">
-            <h2 className="font-space font-bold text-xl text-slate-900">
-              Clinical Trial Protocols
-            </h2>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold">
-              {filteredTrials.length}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {(
-              [
-                { id: 'all', label: 'All Trials' },
-                { id: 'open', label: 'Open for CRO' },
-                { id: 'active', label: 'Active Review' },
-                { id: 'settled', label: 'Settled' },
-                { id: 'disputed', label: 'Disputed' },
-                ...(account ? [{ id: 'mine', label: 'My Trials' }] : []),
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setFilterRole(tab.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                  filterRole === tab.id
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Trials Grid */}
-        {filteredTrials.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-clinical-border p-12 text-center shadow-xs">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
-              <Activity className="w-7 h-7" />
+        {/* PROMAX 3-PANEL REGULATORY CONSOLE (COCKPIT MODE) */}
+        {layoutMode === 'cockpit' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left 3 Cols: Protocol Pipeline Sidebar */}
+            <div className="lg:col-span-3">
+              <TrialPipelineSidebar
+                trials={trials}
+                selectedTrialId={selectedTrial?.trial_id || null}
+                onSelectTrial={(t) => setSelectedTrial(t)}
+                onOpenCreate={() => setIsCreateOpen(true)}
+                selectedFilter={filterRole}
+                onFilterChange={(f) => setFilterRole(f)}
+                searchQuery={searchQuery}
+                onSearchChange={(q) => setSearchQuery(q)}
+                account={account}
+              />
             </div>
-            <h3 className="font-space font-bold text-lg text-slate-800">
-              No Clinical Trials Found
-            </h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-5">
-              No trials currently match the selected filter. As a Pharma Sponsor, you can register a new milestone grant.
-            </p>
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-xl shadow-sm shadow-teal-600/20"
-            >
-              Deposit New Milestone Grant
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTrials.map((trial) => (
-              <TrialCard
-                key={trial.trial_id}
-                trial={trial}
+
+            {/* Middle 6 Cols: High-Precision Clinical Inspection Cockpit */}
+            <div className="lg:col-span-6">
+              <ClinicalConsoleCockpit
+                trial={selectedTrial}
                 account={account}
                 onOpenSubmitData={(t) => setSubmitTargetTrial(t)}
                 onOpenAuditInspector={(t) => setInspectTrial(t)}
@@ -585,20 +564,51 @@ export function App() {
                 onAdjudicate={handleAdjudicate}
                 onFinalize={handleFinalize}
                 onCancel={handleCancel}
-                isActionLoading={isTxPending}
+                isProcessing={isTxPending}
               />
-            ))}
+            </div>
+
+            {/* Right 3 Cols: DeSci Regulatory Vault & Treasury Panel */}
+            <div className="lg:col-span-3">
+              <DeSciRegulatoryVaultSidebar
+                stats={stats || { total_trials: trials.length, total_grant_locked: '0', total_trials_settled: 0, owner: '' }}
+                trials={trials}
+                onOpenLibrary={() => setIsLibraryOpen(true)}
+                onOpenCreate={() => setIsCreateOpen(true)}
+              />
+            </div>
+          </div>
+        ) : (
+          /* TRADITIONAL PROTOCOL GRID MODE */
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {trials.map((trial) => (
+                <TrialCard
+                  key={trial.trial_id}
+                  trial={trial}
+                  account={account}
+                  onOpenSubmitData={(t) => setSubmitTargetTrial(t)}
+                  onOpenAuditInspector={(t) => setInspectTrial(t)}
+                  onOpenAppeal={(t) => setAppealTrial(t)}
+                  onOpenAdjudicateAppeal={(t) => setAdjudicateAppealTrial(t)}
+                  onAdjudicate={handleAdjudicate}
+                  onFinalize={handleFinalize}
+                  onCancel={handleCancel}
+                  isActionLoading={isTxPending}
+                />
+              ))}
+            </div>
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-clinical-border bg-white mt-12">
+      <footer className="border-t border-slate-200 bg-white mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-space font-bold text-slate-800">AgentFDA</span>
             <span>•</span>
-            <span>GenLayer StudioNet Consensus</span>
+            <span>GenLayer StudioNet Biostatistical Consensus</span>
             <span>•</span>
             <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded">
               Chain ID: 61999
