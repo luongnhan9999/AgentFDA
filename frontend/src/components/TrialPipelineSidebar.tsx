@@ -135,9 +135,15 @@ export const TrialPipelineSidebar: React.FC<TrialPipelineSidebarProps> = ({
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {filtered.length === 0 ? (
           <div className="text-center py-10 px-4">
-            <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-700">No trials match criteria</p>
-            <p className="text-[11px] text-slate-400 mt-1">Try resetting filters or search terms</p>
+            <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2 animate-pulse" />
+            <p className="text-xs font-semibold text-slate-700">
+              {trials.length === 0 ? 'No Active Protocols Yet' : 'No trials match criteria'}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+              {trials.length === 0
+                ? 'Contract initialized. Create a milestone grant to initiate Trial #0.'
+                : 'Try resetting filters or search terms'}
+            </p>
           </div>
         ) : (
           filtered.map((t) => {
