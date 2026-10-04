@@ -1,7 +1,7 @@
 import { studionet } from 'genlayer-js/chains';
 
 // Canonical Deployed Contract on GenLayer StudioNet
-export const DEFAULT_CONTRACT_ADDRESS = "0x557a9EF1Da1c5e95c387Ac54665F374927037042";
+export const DEFAULT_CONTRACT_ADDRESS = "0x6392Ab99A3ff0b47514d44e6c9De1d607025a5e7";
 
 export const GENLAYER_STUDIONET = {
   ...studionet,
