@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { X, PlusCircle, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, PlusCircle, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 
 interface CreateTrialModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (drugCandidate: string, maxSae: number, minEfficacy: number, durationBlocks: number, amountGen: string) => Promise<void>;
   isLoading: boolean;
+  initialDrug?: string;
+  initialMaxSae?: number;
+  initialMinEff?: number;
 }
 
 export const CreateTrialModal: React.FC<CreateTrialModalProps> = ({
@@ -13,13 +16,22 @@ export const CreateTrialModal: React.FC<CreateTrialModalProps> = ({
   onClose,
   onSubmit,
   isLoading,
+  initialDrug = 'CTX-904 Oncology Kinase Inhibitor',
+  initialMaxSae = 5,
+  initialMinEff = 60,
 }) => {
-  const [drugCandidate, setDrugCandidate] = useState('CTX-904 Oncology Kinase Inhibitor');
-  const [maxSae, setMaxSae] = useState(5);
-  const [minEfficacy, setMinEfficacy] = useState(60);
+  const [drugCandidate, setDrugCandidate] = useState(initialDrug);
+  const [maxSae, setMaxSae] = useState(initialMaxSae);
+  const [minEfficacy, setMinEfficacy] = useState(initialMinEff);
   const [durationBlocks, setDurationBlocks] = useState(6000);
   const [amountGen, setAmountGen] = useState('1.0');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialDrug) setDrugCandidate(initialDrug);
+    if (initialMaxSae) setMaxSae(initialMaxSae);
+    if (initialMinEff) setMinEfficacy(initialMinEff);
+  }, [initialDrug, initialMaxSae, initialMinEff, isOpen]);
 
   if (!isOpen) return null;
 

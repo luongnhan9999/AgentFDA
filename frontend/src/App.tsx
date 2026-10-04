@@ -8,9 +8,11 @@ import { CreateTrialModal } from './components/CreateTrialModal';
 import { SubmitDataModal } from './components/SubmitDataModal';
 import { AuditInspectorModal } from './components/AuditInspectorModal';
 import { AppealModal } from './components/AppealModal';
+import { AdjudicateAppealModal } from './components/AdjudicateAppealModal';
+import { BiostatisticsSimModal } from './components/BiostatisticsSimModal';
 import { ClinicalTrialData, StatsData } from './types';
 import { DEFAULT_CONTRACT_ADDRESS, CHAIN_ID_HEX } from './config/genlayer';
-import { Plus, Activity, RefreshCw, AlertCircle, Sparkles, Filter, ShieldCheck, Microscope } from 'lucide-react';
+import { Plus, Activity, RefreshCw, AlertCircle, Sparkles, Filter, ShieldCheck, Microscope, Database, HelpCircle } from 'lucide-react';
 
 export function App() {
   const [account, setAccount] = useState<string | null>(null);
@@ -30,9 +32,16 @@ export function App() {
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [submitTargetTrial, setSubmitTargetTrial] = useState<ClinicalTrialData | null>(null);
   const [inspectTrial, setInspectTrial] = useState<ClinicalTrialData | null>(null);
   const [appealTrial, setAppealTrial] = useState<ClinicalTrialData | null>(null);
+  const [adjudicateAppealTrial, setAdjudicateAppealTrial] = useState<ClinicalTrialData | null>(null);
+
+  // Pre-fill parameters for Create Modal from Library
+  const [presetDrug, setPresetDrug] = useState('CTX-904 Oncology Kinase Inhibitor');
+  const [presetMaxSae, setPresetMaxSae] = useState(5);
+  const [presetMinEff, setPresetMinEff] = useState(60);
 
   // Initialize and check MetaMask on load
   useEffect(() => {
@@ -300,6 +309,36 @@ export function App() {
     }
   };
 
+  const handleAdjudicateAppeal = async (trialId: number, supplementalUrl: string) => {
+    if (!account) {
+      await connectWallet();
+      return;
+    }
+    setIsTxPending(true);
+    setTxMessage(`Convening Supreme Appellate Tribunal for Trial #${trialId}... GenVM validators rendering supplemental audit logs.`);
+    setErrorMsg(null);
+    try {
+      const client = getClient();
+      const tx = await (client as any).writeContract({
+        address: DEFAULT_CONTRACT_ADDRESS,
+        functionName: 'adjudicate_appeal',
+        args: [trialId, supplementalUrl],
+      });
+
+      setTxMessage('Appellate tribunal consensus reached! Settling escrow & dispute bond on StudioNet...');
+      await (client as any).waitForTransactionReceipt({ hash: tx });
+      setAdjudicateAppealTrial(null);
+      await fetchContractState();
+      if (account) fetchBalance(account);
+    } catch (err: any) {
+      console.error('Adjudicate appeal error:', err);
+      setErrorMsg(err.message || 'Appellate adjudication failed');
+    } finally {
+      setIsTxPending(false);
+      setTxMessage('');
+    }
+  };
+
   const handleFinalize = async (trialId: number) => {
     if (!account) {
       await connectWallet();
@@ -391,14 +430,14 @@ export function App() {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grow w-full">
         {/* Banner Hero */}
-        <div className="bg-linear-to-r from-teal-900 via-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden mb-6">
+        <div className="bg-linear-to-r from-teal-950 via-slate-900 to-indigo-950 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden mb-6 border border-teal-800/30">
           <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold mb-4 backdrop-blur-xs">
               <Microscope className="w-3.5 h-3.5" />
-              <span>DeSci × Intelligent Oracle Protocol</span>
+              <span>DeSci × Autonomous AI Regulatory Jury</span>
             </div>
             <h1 className="font-space font-bold text-2xl sm:text-4xl tracking-tight leading-tight">
-              Autonomous Clinical Trial Milestones & Patient Safety Oracle
+              AgentFDA: Autonomous Clinical Trial Milestone & Patient Safety Oracle
             </h1>
             <p className="mt-3 text-sm sm:text-base text-slate-300 font-sans leading-relaxed">
               Eliminate sponsor bias and clinical p-hacking. GenLayer GenVM validators independently ingest de-identified cohort datasets, audit DSMB safety feeds, and release milestone grants upon mathematical consensus.
@@ -412,21 +451,28 @@ export function App() {
                 <Plus className="w-4 h-4" />
                 <span>Deposit Milestone Grant</span>
               </button>
+              <button
+                onClick={() => setIsLibraryOpen(true)}
+                className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-teal-200 font-medium text-xs sm:text-sm rounded-xl border border-teal-400/30 transition-all flex items-center gap-2"
+              >
+                <Database className="w-4 h-4 text-teal-400" />
+                <span>Study Case Library</span>
+              </button>
               <a
                 href="https://github.com/luongnhan9999/AgentFDA"
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2.5 bg-white/10 hover:bg-white/15 text-white font-medium text-xs sm:text-sm rounded-xl border border-white/20 transition-all flex items-center gap-2"
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white font-medium text-xs sm:text-sm rounded-xl border border-white/20 transition-all flex items-center gap-2"
               >
                 <ShieldCheck className="w-4 h-4 text-teal-400" />
-                <span>Protocol Specs & Architecture</span>
+                <span>Protocol Specs</span>
               </a>
             </div>
           </div>
 
           {/* Decorative Background Blob */}
-          <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute right-40 -top-20 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -right-20 -bottom-20 w-96 h-96 bg-teal-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute right-40 -top-20 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
         </div>
 
         {/* Global Stats Overview */}
@@ -535,6 +581,7 @@ export function App() {
                 onOpenSubmitData={(t) => setSubmitTargetTrial(t)}
                 onOpenAuditInspector={(t) => setInspectTrial(t)}
                 onOpenAppeal={(t) => setAppealTrial(t)}
+                onOpenAdjudicateAppeal={(t) => setAdjudicateAppealTrial(t)}
                 onAdjudicate={handleAdjudicate}
                 onFinalize={handleFinalize}
                 onCancel={handleCancel}
@@ -592,6 +639,9 @@ export function App() {
         onClose={() => setIsCreateOpen(false)}
         onSubmit={handleCreateTrial}
         isLoading={isTxPending}
+        initialDrug={presetDrug}
+        initialMaxSae={presetMaxSae}
+        initialMinEff={presetMinEff}
       />
 
       <SubmitDataModal
@@ -614,6 +664,25 @@ export function App() {
         trial={appealTrial}
         onSubmitAppeal={handleAppealSubmit}
         isLoading={isTxPending}
+      />
+
+      <AdjudicateAppealModal
+        isOpen={Boolean(adjudicateAppealTrial)}
+        onClose={() => setAdjudicateAppealTrial(null)}
+        trial={adjudicateAppealTrial}
+        onSubmit={handleAdjudicateAppeal}
+        isLoading={isTxPending}
+      />
+
+      <BiostatisticsSimModal
+        isOpen={isLibraryOpen}
+        onClose={() => setIsLibraryOpen(false)}
+        onSelectSample={(drug, sae, minEff) => {
+          setPresetDrug(drug);
+          setPresetMaxSae(sae);
+          setPresetMinEff(minEff);
+          setIsCreateOpen(true);
+        }}
       />
     </div>
   );
