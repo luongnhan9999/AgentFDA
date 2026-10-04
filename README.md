@@ -2,7 +2,7 @@
 
 [![GenLayer StudioNet](https://img.shields.io/badge/Network-GenLayer%20StudioNet-0D9488?style=for-the-badge)](https://studio.genlayer.com)
 [![Chain ID](https://img.shields.io/badge/Chain%20ID-61999%20%2F%200xF1EF-2563EB?style=for-the-badge)](https://genlayer-explorer.vercel.app)
-[![Contract](https://img.shields.io/badge/Contract-0x557a9EF1Da1c5e95c387Ac54665F374927037042-10B981?style=for-the-badge)](https://genlayer-explorer.vercel.app/address/0x557a9EF1Da1c5e95c387Ac54665F374927037042)
+[![Vercel Deployment](https://img.shields.io/badge/Live%20dApp-agentfda.vercel.app-0D9488?style=for-the-badge)](https://agentfda.vercel.app)
 [![License: MIT](https://img.shields.io/badge/License-MIT-slate?style=for-the-badge)](LICENSE)
 
 > **Decentralized Science (DeSci) & AI Safety Oracle:** Autonomous clinical trial milestone escrow, biostatistical p-value verification, and Data Safety Monitoring Board (DSMB) adverse event auditing on GenLayer GenVM.
