@@ -53,11 +53,12 @@ class MockMessage:
 class MockNondetWeb:
     def __init__(self):
         self.mock_responses = {}
+        self.default_response = "PATIENTS:120 ORR:0.75 SAE:0.02 P_VALUE:0.001"
 
     def render(self, url, mode="text"):
         if url in self.mock_responses:
             return self.mock_responses[url]
-        return "PATIENTS:120 ORR:0.75 SAE:0.02 P_VALUE:0.001"
+        return self.default_response
 
 
 class MockNondet:
@@ -116,6 +117,7 @@ def setup_gl_mock():
             instance = super().__new__(cls)
             instance.trials = {}
             instance.trial_ids = []
+            instance.claimable_balances = {}
             return instance
 
     gl_module.UserError = UserError
@@ -142,6 +144,7 @@ def setup_gl_mock():
     mock_public = PublicDecorator()
     mock_env.Contract = ContractStorageBase
     mock_env.public = mock_public
+    mock_env.UserError = UserError
     gl_module.gl = mock_env
 
     sys.modules["genlayer"] = gl_module
@@ -175,7 +178,7 @@ def test_agent_fda_approved_lifecycle():
         60, # min 60% efficacy
         6000
     )
-    assert trial_id == 1
+    assert trial_id == "1"
     assert app.total_grant_locked == escrow_amount
 
     # Step 2: CRO claims trial & submits cohort logs
@@ -210,8 +213,9 @@ def test_agent_fda_approved_lifecycle():
     assert trial_mid["measured_efficacy_pct"] == 75
     assert trial_mid["measured_sae_pct"] == 2
 
-    # Step 4: Advance beyond 24 blocks cooling-off window and finalize settlement
-    app.trial_counter += 25
+    # Step 4: Advance beyond 24 blocks cooling-off window (72s) and finalize settlement
+    # Update timestamp
+    mock_env.message_raw = {"datetime": "2026-10-16T15:00:00Z"}
     app.finalize_settlement(trial_id)
 
     trial_final = json.loads(app.get_trial(trial_id))
@@ -266,7 +270,7 @@ def test_agent_fda_safety_terminated_on_high_sae():
     assert trial_mid["measured_sae_pct"] == 12
 
     # Finalize settlement refunds sponsor 100%
-    app.trial_counter += 25
+    mock_env.message_raw = {"datetime": "2026-10-16T15:00:00Z"}
     app.finalize_settlement(trial_id)
 
     trial_final = json.loads(app.get_trial(trial_id))
@@ -316,13 +320,13 @@ def test_agent_fda_appeal_inconclusive_settlement():
     mock_env.message.sender_address = cro
     bond = 100_000_000_000_000_000  # 0.1 GEN
     mock_env.message.value = bond
+    supp_url = "https://supplemental-cro-audit.org/cart99_reviewed.json"
 
-    app.appeal_verdict(trial_id, "Re-classified CRS Grade 1 non-serious under revised protocol.")
+    app.appeal_verdict(trial_id, "Re-classified CRS Grade 1 non-serious under revised protocol.", supp_url)
     trial_disp = json.loads(app.get_trial(trial_id))
     assert trial_disp["status"] == 6  # STATUS_DISPUTED
 
     # Appellate review finds safety verified but efficacy still marginal -> APPEAL_UPHELD_INCONCLUSIVE
-    supp_url = "https://supplemental-cro-audit.org/cart99_reviewed.json"
     mock_env.nondet.web.mock_responses[supp_url] = "Verified SAE rate 3.5%, efficacy 55%"
     mock_env.nondet.llm_response = {
         "canary": "CANARY_AGENT_FDA_SAFETY_V1",
@@ -330,16 +334,50 @@ def test_agent_fda_appeal_inconclusive_settlement():
         "reason": "Safety limits honored upon re-adjudication, but efficacy falls short of 70%."
     }
 
-    app.adjudicate_appeal(trial_id, supp_url)
+    app.adjudicate_appeal(trial_id)
 
     trial_final = json.loads(app.get_trial(trial_id))
     assert trial_final["status"] == 5  # STATUS_SETTLED_INCONCLUSIVE
     assert trial_final["verdict"] == "TRIAL_INCONCLUSIVE"
 
-    # Payout is 50/50 split of escrow (0.5 GEN each) and bond forfeited to sponsor
+    # Payout is 50/50 split of escrow (0.5 GEN each) and bond returned to appellant
     cro_transfers = mock_env.get_contract_at(cro).transfers
     sponsor_transfers = mock_env.get_contract_at(sponsor).transfers
 
     assert any(t["value"] == 500_000_000_000_000_000 for t in cro_transfers)
     assert any(t["value"] == 500_000_000_000_000_000 for t in sponsor_transfers)
-    assert any(t["value"] == bond for t in sponsor_transfers)
+    assert any(t["value"] == bond for t in cro_transfers)
+
+
+def test_agent_fda_unresolved_on_unreachable_evidence():
+    mock_env = setup_gl_mock()
+    import contract
+    contract.gl = mock_env
+
+    app = contract.Contract()
+    sponsor = SimulatedAddress("0xAAAA111122223333444455556666777788889999")
+    cro = SimulatedAddress("0xBBBB111122223333444455556666777788889999")
+
+    mock_env.message.sender_address = sponsor
+    mock_env.message.value = 1_000_000_000_000_000_000
+    trial_id = app.create_trial_grant("UNRESOLVED-DRUG", 5, 60, 6000)
+
+    mock_env.message.sender_address = cro
+    app.submit_trial_data(trial_id, "https://dead-link-404.com/cohort", "https://dead-link-404.com/dsmb")
+
+    # Both links unreachable
+    mock_env.nondet.web.mock_responses = {}
+    mock_env.nondet.web.default_response = ""
+
+    mock_env.message.sender_address = cro
+    app.adjudicate_milestone(trial_id)
+
+    trial_unres = json.loads(app.get_trial(trial_id))
+    assert trial_unres["status"] == 8  # STATUS_UNRESOLVED
+    assert "UNRESOLVED_FETCH_FAILED" in trial_unres["verdict"]
+
+    # Finalize must be rejected
+    with pytest.raises(Exception) as exc:
+        app.finalize_settlement(trial_id)
+    assert "Cannot settle trial in an unresolved error state" in str(exc.value)
+

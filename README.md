@@ -26,8 +26,8 @@ In traditional clinical trials, **$50B+ annually** is locked in milestone-based 
 - **Intelligent Contract:** `contracts/contract.py`
 - **Network:** GenLayer StudioNet (Chain ID: `61999` / `0xF1EF`)
 - **RPC Endpoint:** `https://studio.genlayer.com/api`
-- **Deployed Address:** `0xFF318F6314723F4e9E0b3CeFBC6994eA0b1D69Df`
-- **Block Explorer:** [View Contract on GenLayer Explorer](https://genlayer-explorer.vercel.app/address/0xFF318F6314723F4e9E0b3CeFBC6994eA0b1D69Df)
+- **Deployed Address:** `0x187Eb9E722eC0c39b3F612DA4d325476f2e87068`
+- **Block Explorer:** [View Contract on GenLayer Explorer](https://genlayer-explorer.vercel.app/address/0x187Eb9E722eC0c39b3F612DA4d325476f2e87068)
 
 ### Lifecycle State Machine
 
