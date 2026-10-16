@@ -1,5 +1,9 @@
 # 🧬 AgentFDA: Autonomous Clinical Trial Milestone & Patient Safety Oracle
 
+<p align="center">
+  <img src="logo.png" alt="AgentFDA Logo" width="220" style="border-radius: 16px;" />
+</p>
+
 [![GenLayer StudioNet](https://img.shields.io/badge/Network-GenLayer%20StudioNet-0D9488?style=for-the-badge)](https://studio.genlayer.com)
 [![Chain ID](https://img.shields.io/badge/Chain%20ID-61999%20%2F%200xF1EF-2563EB?style=for-the-badge)](https://genlayer-explorer.vercel.app)
 [![Vercel Deployment](https://img.shields.io/badge/Live%20dApp-agentfda.vercel.app-0D9488?style=for-the-badge)](https://agentfda.vercel.app)
