@@ -75,7 +75,7 @@ class Contract(gl.Contract):
     AgentFDA: Autonomous Clinical Trial Milestone & Patient Safety Oracle
     Target Network: GenLayer studionet (Chain ID: 61999)
     """
-    trials: TreeMap[u64, ClinicalTrial]
+    trials: TreeMap[str, ClinicalTrial]
     trial_ids: DynArray[u64]
     total_grant_locked: bigint
     total_trials_settled: u32
@@ -152,7 +152,7 @@ class Contract(gl.Contract):
             audit_completed_block=u256(0),
         )
 
-        self.trials[trial_id] = new_trial
+        self.trials[str(trial_id)] = new_trial
         self.trial_ids.append(trial_id)
         self.total_grant_locked = self.total_grant_locked + escrow
         return trial_id
@@ -169,10 +169,10 @@ class Contract(gl.Contract):
         Claims trial and submits patient cohort outcomes & DSMB safety monitoring links.
         """
         self._ensure_owner()
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         if t.status != STATUS_TRIAL_OPEN:
             raise gl.UserError("Trial is not open for cohort data submission.")
 
@@ -201,10 +201,10 @@ class Contract(gl.Contract):
         Renders clinical data, analyzes p-value, primary endpoint efficacy, and adverse event safety.
         """
         self._ensure_owner()
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         if t.status != STATUS_IN_TRIAL:
             raise gl.UserError("Trial is not awaiting milestone adjudication.")
 
@@ -371,10 +371,10 @@ Respond ONLY with valid JSON without markdown fences:
         Sponsor or Investigator can appeal within 24 blocks cooling-off window with a 10% dispute bond.
         """
         self._ensure_owner()
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         if t.status != STATUS_AWAITING_PAYOUT:
             raise gl.UserError("Can only appeal trials in AWAITING_PAYOUT status.")
 
@@ -412,10 +412,10 @@ Respond ONLY with valid JSON without markdown fences:
         Appellate Medical Ethics Tribunal re-examines trial with third-party audited patient logs.
         """
         self._ensure_owner()
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         if t.status != STATUS_DISPUTED:
             raise gl.UserError("Trial is not in DISPUTED status.")
 
@@ -537,10 +537,10 @@ Respond ONLY with valid JSON:
         Executes un-disputed payout strictly after 24 blocks cooling-off window.
         """
         self._ensure_owner()
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         if t.status != STATUS_AWAITING_PAYOUT:
             raise gl.UserError("Trial is not awaiting settlement payout.")
 
@@ -582,10 +582,10 @@ Respond ONLY with valid JSON:
     def cancel_or_reclaim(self, trial_id: u64) -> None:
         """Sponsor reclaims grant if trial expired unclaimed or trial monitoring stalled (>120 blocks)."""
         self._ensure_owner()
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         if _addr_str(_get_sender()) != _addr_str(t.sponsor):
             raise gl.UserError("Role Violation: Only the verified trial sponsor can cancel or reclaim grant.")
 
@@ -613,10 +613,10 @@ Respond ONLY with valid JSON:
 
     @gl.public.view
     def get_trial(self, trial_id: u64) -> str:
-        if trial_id not in self.trials:
+        if str(trial_id) not in self.trials:
             raise gl.UserError(f"Clinical trial {int(trial_id)} does not exist.")
 
-        t = self.trials[trial_id]
+        t = self.trials[str(trial_id)]
         data = {
             "trial_id": int(t.trial_id),
             "sponsor": _addr_str(t.sponsor),
@@ -650,8 +650,8 @@ Respond ONLY with valid JSON:
     def get_all_trials(self) -> str:
         trials_list = []
         for tid in self.trial_ids:
-            if tid in self.trials:
-                t = self.trials[tid]
+            if str(tid) in self.trials:
+                t = self.trials[str(tid)]
                 trials_list.append({
                     "trial_id": int(t.trial_id),
                     "sponsor": _addr_str(t.sponsor),
