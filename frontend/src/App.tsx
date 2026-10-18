@@ -307,7 +307,7 @@ export function App() {
     }
   };
 
-  const handleAppealSubmit = async (trialId: number, disputeReason: string, bondGen: string) => {
+  const handleAppealSubmit = async (trialId: number | string, disputeReason: string, supplementalUrl: string, bondGen: string) => {
     if (!account) {
       await connectWallet();
       return;
@@ -322,7 +322,7 @@ export function App() {
       const tx = await (client as any).writeContract({
         address: DEFAULT_CONTRACT_ADDRESS,
         functionName: 'appeal_verdict',
-        args: [trialId, disputeReason],
+        args: [String(trialId), disputeReason, supplementalUrl],
         value: weiBond,
       });
 
@@ -340,20 +340,20 @@ export function App() {
     }
   };
 
-  const handleAdjudicateAppeal = async (trialId: number, supplementalUrl: string) => {
+  const handleAdjudicateAppeal = async (trialId: number | string) => {
     if (!account) {
       await connectWallet();
       return;
     }
     setIsTxPending(true);
-    setTxMessage(`Convening Supreme Appellate Tribunal for Trial #${trialId}... GenVM validators rendering supplemental audit logs.`);
+    setTxMessage(`Convening Supreme Appellate Tribunal for Trial #${trialId}... GenVM validators rendering bound supplemental audit logs.`);
     setErrorMsg(null);
     try {
       const client = getClient();
       const tx = await (client as any).writeContract({
         address: DEFAULT_CONTRACT_ADDRESS,
         functionName: 'adjudicate_appeal',
-        args: [trialId, supplementalUrl],
+        args: [String(trialId)],
       });
 
       setTxMessage('Appellate tribunal consensus reached! Settling escrow & dispute bond on StudioNet...');

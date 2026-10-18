@@ -7,7 +7,7 @@ interface AppealModalProps {
   isOpen: boolean;
   onClose: () => void;
   trial: ClinicalTrialData | null;
-  onSubmitAppeal: (trialId: number, disputeReason: string, bondGen: string) => Promise<void>;
+  onSubmitAppeal: (trialId: number, disputeReason: string, supplementalAuditUrl: string, bondGen: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -20,6 +20,9 @@ export const AppealModal: React.FC<AppealModalProps> = ({
 }) => {
   const [disputeReason, setDisputeReason] = useState(
     'Supplemental independent pathology review indicates SAE event was non-drug related.'
+  );
+  const [supplementalAuditUrl, setSupplementalAuditUrl] = useState(
+    'https://raw.githubusercontent.com/luongnhan9999/AgentFDA/main/README.md'
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +41,14 @@ export const AppealModal: React.FC<AppealModalProps> = ({
       return;
     }
 
+    const cleanUrl = supplementalAuditUrl.trim();
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      setError('Please provide a valid HTTP/HTTPS supplemental clinical audit URL.');
+      return;
+    }
+
     try {
-      await onSubmitAppeal(trial.trial_id, disputeReason.trim(), bondGen);
+      await onSubmitAppeal(trial.trial_id, disputeReason.trim(), cleanUrl, bondGen);
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Transaction failed on GenLayer.');
@@ -90,12 +99,29 @@ export const AppealModal: React.FC<AppealModalProps> = ({
               Dispute Justification & Clinical Defense Rationale
             </label>
             <textarea
-              rows={4}
+              rows={3}
               value={disputeReason}
               onChange={(e) => setDisputeReason(e.target.value)}
               className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 font-sans text-slate-900"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Supplemental Clinical Audit / Pathology URL
+            </label>
+            <input
+              type="url"
+              value={supplementalAuditUrl}
+              onChange={(e) => setSupplementalAuditUrl(e.target.value)}
+              placeholder="https://independent-audit.org/re-analysis.json"
+              className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 font-mono text-slate-900"
+              required
+            />
+            <span className="text-[11px] text-slate-400">
+              External dossier link for GenVM validators during Supreme Appellate Deliberation
+            </span>
           </div>
 
           <div className="pt-2">

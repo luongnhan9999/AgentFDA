@@ -6,7 +6,7 @@ interface AdjudicateAppealModalProps {
   isOpen: boolean;
   onClose: () => void;
   trial: ClinicalTrialData | null;
-  onSubmit: (trialId: number, supplementalUrl: string) => Promise<void>;
+  onSubmit: (trialId: number) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -17,9 +17,6 @@ export const AdjudicateAppealModal: React.FC<AdjudicateAppealModalProps> = ({
   onSubmit,
   isLoading,
 }) => {
-  const [supplementalUrl, setSupplementalUrl] = useState(
-    'https://raw.githubusercontent.com/luongnhan9999/AgentFDA/main/README.md'
-  );
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !trial) return null;
@@ -28,14 +25,8 @@ export const AdjudicateAppealModal: React.FC<AdjudicateAppealModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    const cleanUrl = supplementalUrl.trim();
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      setError('Please provide a valid HTTP/HTTPS supplemental clinical audit URL.');
-      return;
-    }
-
     try {
-      await onSubmit(trial.trial_id, cleanUrl);
+      await onSubmit(trial.trial_id);
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Transaction failed on GenLayer.');
@@ -80,23 +71,31 @@ export const AdjudicateAppealModal: React.FC<AdjudicateAppealModalProps> = ({
               <span>Supreme Appellate Deliberation</span>
             </div>
             <div>
-              GenVM validators will render the supplemental clinical dossier, independently audit patient safety vs. efficacy, and reach a final binding consensus verdict (Overturn / Inconclusive / Dismiss).
+              GenVM validators render the bound supplemental clinical audit URL, independently audit patient safety vs. efficacy, and reach a final binding consensus verdict (Overturn / Inconclusive / Dismiss).
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Supplemental Third-Party Audit / Dossier Endpoint URL
+              Bound Supplemental Clinical Audit URL (On-Chain)
             </label>
-            <input
-              type="url"
-              value={supplementalUrl}
-              onChange={(e) => setSupplementalUrl(e.target.value)}
-              placeholder="https://independent-audit.org/re-analysis.json"
-              className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-orange-500/20 focus:border-orange-600 font-mono text-slate-900"
-              required
-            />
-            <span className="text-[11px] text-slate-400">Re-audited logs or corrected pathology records</span>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs font-mono text-slate-700 break-all">
+              <span className="truncate mr-2">
+                {trial.supplemental_evidence_url || 'https://raw.githubusercontent.com/luongnhan9999/AgentFDA/main/README.md'}
+              </span>
+              <a
+                href={trial.supplemental_evidence_url || 'https://raw.githubusercontent.com/luongnhan9999/AgentFDA/main/README.md'}
+                target="_blank"
+                rel="noreferrer"
+                className="text-orange-600 hover:text-orange-700 shrink-0 inline-flex items-center gap-1 font-sans font-semibold"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                <span>Verify</span>
+              </a>
+            </div>
+            <span className="text-[11px] text-slate-400">
+              Immutable supplemental evidence locked during appeal submission
+            </span>
           </div>
 
           <div className="pt-2">

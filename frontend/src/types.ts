@@ -17,9 +17,15 @@ export interface ClinicalTrialData {
   confidence: number;
   measured_efficacy_pct: number;
   measured_sae_pct: number;
-  created_at_block: string;
-  expires_at_block: string;
-  audit_completed_block: string;
+  created_at_block?: string;
+  expires_at_block?: string;
+  audit_completed_block?: string;
+  created_at_time?: string;
+  expires_at_time?: string;
+  audit_completed_time?: string;
+  supplemental_evidence_url?: string;
+  appeal_prior_verdict?: string;
+  original_verdict?: string;
 }
 
 export interface StatsData {

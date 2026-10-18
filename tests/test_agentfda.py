@@ -381,3 +381,145 @@ def test_agent_fda_unresolved_on_unreachable_evidence():
         app.finalize_settlement(trial_id)
     assert "Cannot settle trial in an unresolved error state" in str(exc.value)
 
+
+def test_contract_method_signatures_appeal_flow():
+    """
+    Verifies that the contract method signatures strictly match the specification:
+    - appeal_verdict(self, trial_id: str, dispute_reason: str, supplemental_audit_url: str)
+    - adjudicate_appeal(self, trial_id: str) with NO extra arguments.
+    """
+    import inspect
+    setup_gl_mock()
+    import contract
+
+    # 1. Verify appeal_verdict signature has supplemental_audit_url
+    sig_appeal = inspect.signature(contract.Contract.appeal_verdict)
+    appeal_params = list(sig_appeal.parameters.keys())
+    assert appeal_params == ["self", "trial_id", "dispute_reason", "supplemental_audit_url"], (
+        f"appeal_verdict signature mismatch! Expected ['self', 'trial_id', 'dispute_reason', 'supplemental_audit_url'], got {appeal_params}"
+    )
+
+    # 2. Verify adjudicate_appeal signature (strictly trial_id only, no extra arguments)
+    sig_adjudicate = inspect.signature(contract.Contract.adjudicate_appeal)
+    adjudicate_params = list(sig_adjudicate.parameters.keys())
+    assert adjudicate_params == ["self", "trial_id"], (
+        f"adjudicate_appeal signature mismatch! Expected ['self', 'trial_id'], got {adjudicate_params}"
+    )
+
+
+def test_appeal_verdict_signature_and_argument_validation():
+    """
+    Verifies runtime enforcement of appeal_verdict arguments:
+    - Requires supplemental_audit_url (missing argument raises TypeError)
+    - Rejects invalid URL format (raises gl.UserError)
+    - Records supplemental_evidence_url on-chain when valid arguments are supplied.
+    """
+    mock_env = setup_gl_mock()
+    import contract
+    contract.gl = mock_env
+
+    app = contract.Contract()
+    sponsor = SimulatedAddress("0xAAAA111122223333444455556666777788889999")
+    cro = SimulatedAddress("0xBBBB111122223333444455556666777788889999")
+
+    mock_env.message.sender_address = sponsor
+    mock_env.message.value = 1_000_000_000_000_000_000
+    trial_id = app.create_trial_grant("ONCO-SIG-CHECK", 5, 70, 6000)
+
+    mock_env.message.sender_address = cro
+    cohort_url = "https://clinicaltrials.org/onco/cohort.json"
+    dsmb_url = "https://dsmb.org/onco/safety.txt"
+    app.submit_trial_data(trial_id, cohort_url, dsmb_url)
+
+    # Adjudicate to reach AWAITING_PAYOUT
+    mock_env.nondet.web.mock_responses[cohort_url] = "EFFICACY:40% SAE:8%"
+    mock_env.nondet.web.mock_responses[dsmb_url] = "Toxicity observed."
+    mock_env.nondet.llm_response = {
+        "canary": "CANARY_AGENT_FDA_SAFETY_V1",
+        "verdict": "SAFETY_TERMINATED",
+        "confidence": 92,
+        "measured_efficacy_pct": 40,
+        "measured_sae_pct": 8,
+        "reason": "Excess SAE rate detected.",
+    }
+    app.adjudicate_milestone(trial_id)
+
+    # 1. Missing supplemental_audit_url must raise TypeError
+    mock_env.message.sender_address = cro
+    mock_env.message.value = 100_000_000_000_000_000  # 10% bond
+    with pytest.raises(TypeError):
+        # Calling with only 2 arguments instead of 3
+        app.appeal_verdict(trial_id, "Missing supplemental URL parameter test")  # type: ignore
+
+    # 2. Invalid non-HTTP/HTTPS supplemental_audit_url must raise gl.UserError
+    with pytest.raises(contract.gl.UserError) as exc_url:
+        app.appeal_verdict(trial_id, "Valid justification provided here", "ftp://invalid-evidence.org/data")
+    assert "Valid supplemental audit URL required" in str(exc_url.value)
+
+    # 3. Valid appeal with all arguments must succeed and record supplemental_evidence_url
+    valid_supp_url = "https://independent-dsmb.org/re-audit/onco_sig_checked.json"
+    app.appeal_verdict(trial_id, "Pathology re-classified adverse event as unrelated to trial candidate.", valid_supp_url)
+
+    t = app.trials[trial_id]
+    assert t.status == contract.STATUS_DISPUTED
+    assert t.supplemental_evidence_url == valid_supp_url
+    assert t.dispute_bond == 100_000_000_000_000_000
+
+
+def test_adjudicate_appeal_signature_and_no_extra_arguments():
+    """
+    Verifies that adjudicate_appeal strictly takes only trial_id:
+    - Passing an extra argument raises TypeError
+    - Calling with only trial_id renders the bound supplemental_evidence_url without extra params.
+    """
+    mock_env = setup_gl_mock()
+    import contract
+    contract.gl = mock_env
+
+    app = contract.Contract()
+    sponsor = SimulatedAddress("0xAAAA111122223333444455556666777788889999")
+    cro = SimulatedAddress("0xBBBB111122223333444455556666777788889999")
+
+    mock_env.message.sender_address = sponsor
+    mock_env.message.value = 1_000_000_000_000_000_000
+    trial_id = app.create_trial_grant("ONCO-EXTRA-ARG-CHECK", 5, 70, 6000)
+
+    mock_env.message.sender_address = cro
+    app.submit_trial_data(trial_id, "https://trials.org/data", "https://dsmb.org/audit")
+
+    mock_env.nondet.web.mock_responses["https://trials.org/data"] = "EFFICACY:40% SAE:8%"
+    mock_env.nondet.web.mock_responses["https://dsmb.org/audit"] = "Toxicity observed."
+    mock_env.nondet.llm_response = {
+        "canary": "CANARY_AGENT_FDA_SAFETY_V1",
+        "verdict": "SAFETY_TERMINATED",
+        "confidence": 90,
+        "measured_efficacy_pct": 40,
+        "measured_sae_pct": 8,
+        "reason": "Exceeded safety threshold.",
+    }
+    app.adjudicate_milestone(trial_id)
+
+    mock_env.message.sender_address = cro
+    mock_env.message.value = 100_000_000_000_000_000
+    supp_url = "https://independent-dsmb.org/re-audit/resolved.json"
+    app.appeal_verdict(trial_id, "Adverse event re-classified after unblinded review.", supp_url)
+
+    # 1. Calling adjudicate_appeal with extra arguments must raise TypeError
+    with pytest.raises(TypeError):
+        # Extra argument passed to adjudicate_appeal
+        app.adjudicate_appeal(trial_id, supp_url)  # type: ignore
+
+    # 2. Calling with strictly trial_id succeeds and uses the bound supplemental URL
+    mock_env.nondet.web.mock_responses[supp_url] = "CONFIRMED: SAE 2.5%, Efficacy 72%"
+    mock_env.nondet.llm_response = {
+        "canary": "CANARY_AGENT_FDA_SAFETY_V1",
+        "verdict": "APPEAL_UPHELD_APPROVED",
+        "reason": "Supplemental audit verified safety compliance and endpoint clearance.",
+    }
+
+    app.adjudicate_appeal(trial_id)
+
+    t = app.trials[trial_id]
+    assert t.status == contract.STATUS_SETTLED_APPROVED
+    assert t.verdict == "MILESTONE_APPROVED"
+

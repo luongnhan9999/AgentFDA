@@ -59,10 +59,14 @@ In traditional clinical trials, **$50B+ annually** is locked in milestone-based 
 
 ## 🧪 Automated Test Suite
 
-AgentFDA includes a comprehensive pytest suite in `tests/test_agentfda.py` covering all lifecycle pathways:
+AgentFDA includes a comprehensive pytest suite in `tests/test_agentfda.py` covering all lifecycle pathways and contract signature verifications:
 - `test_agent_fda_approved_lifecycle`: Verifies approved milestone payout to CRO.
 - `test_agent_fda_safety_terminated_on_high_sae`: Verifies 100% biohazard refund on toxic adverse events.
 - `test_agent_fda_appeal_inconclusive_settlement`: Verifies appellate dispute tribunal with bond staking and 50/50 resolution.
+- `test_agent_fda_unresolved_on_unreachable_evidence`: Verifies protected `STATUS_UNRESOLVED` fail-safe when evidence endpoints are unreachable.
+- `test_contract_method_signatures_appeal_flow`: Strictly verifies method signatures via Python `inspect` (`appeal_verdict(self, trial_id, dispute_reason, supplemental_audit_url)` and `adjudicate_appeal(self, trial_id)` with zero extra arguments).
+- `test_appeal_verdict_signature_and_argument_validation`: Verifies `appeal_verdict` runtime argument checking, requiring `supplemental_audit_url`, rejecting invalid URLs, and binding evidence.
+- `test_adjudicate_appeal_signature_and_no_extra_arguments`: Verifies `adjudicate_appeal` strictly rejects extra arguments and executes with only `trial_id`.
 
 To run the test suite:
 ```bash
