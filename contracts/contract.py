@@ -86,15 +86,14 @@ class Contract(gl.Contract):
     owner: Address
     claimable_balances: TreeMap[str, bigint]
 
-    def __init__(self, initial_owner: Address = Address(ZERO_ADDRESS)):
+    def __init__(self):
         deployer = Address(ZERO_ADDRESS)
         try:
             deployer = _get_sender()
         except Exception:
             pass
 
-        target_owner = initial_owner if _addr_str(initial_owner) != ZERO_ADDRESS else deployer
-        self.owner = target_owner
+        self.owner = deployer
         self.total_grant_locked = bigint(0)
         self.total_trials_settled = u32(0)
         self.trial_counter = u64(0)
