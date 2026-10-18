@@ -4,7 +4,7 @@ import json
 from genlayer_py import create_client, studionet, create_account
 from genlayer_py.types.transactions import TransactionStatus
 
-CONTRACT_ADDRESS = "0xDC9224AC83058e7B18D672e03C5C98D46f66F7cF"
+CONTRACT_ADDRESS = "0x5d5380b0622bFfC0492d3bC65516588Df1d1A9aD"
 
 def seed_sample_trials():
     print(f"[*] Seeding real clinical trials on-chain into {CONTRACT_ADDRESS}...")
